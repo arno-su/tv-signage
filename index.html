@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>公司數位看板</title>
+    <style>
+        body { margin: 0; padding: 0; background: #000; color: #fff; font-family: "Microsoft JhengHei", "Heiti TC", sans-serif; overflow: hidden; }
+        #container { display: flex; height: 100vh; }
+        #sidebar { width: 30%; background: #222; padding: 40px; box-sizing: border-box; border-right: 5px solid #ffcc00; display: flex; flex-direction: column; }
+        #clock { font-size: 48px; font-weight: bold; margin-bottom: 40px; color: #aaa; }
+        #list-container { flex-grow: 1; overflow: hidden; }
+        
+        #main { width: 70%; position: relative; }
+        #main img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+        #overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); padding: 60px; }
+        
+        h1 { font-size: 64px; margin: 0 0 20px 0; color: #ffcc00; text-shadow: 2px 2px 4px #000; }
+        p { font-size: 32px; line-height: 1.5; white-space: pre-wrap; }
+        
+        /* 列表項目的樣式 */
+        .list-item { margin-bottom: 30px; transition: all 0.3s; }
+        .list-item.active { color: #fff; border-left: 5px solid #ffcc00; padding-left: 15px; }
+        .list-item.inactive { color: #666; padding-left: 20px; }
+        .list-item h3 { margin: 0; font-size: 28px; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="sidebar">
+        <div id="clock">Loading...</div>
+        <div id="list-container">
+            <!-- 公告列表將顯示於此 -->
+        </div>
+    </div>
+    <div id="main">
+        <img id="main-img" src="" alt="">
+        <div id="overlay">
+            <h1 id="main-title">載入中...</h1>
+            <p id="main-content">正在連線至自動化系統...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================= 設定區 =================
+    // 您的 n8n Webhook 網址
+    const API_URL = 'https://arnon8n.zeabur.app/webhook/signage-data';
+    // =========================================
+    
+    let currentIndex = 0;
+    let announcements = [];
+
+    // 1. 時鐘功能
+    function updateClock() {
+        const now = new Date();
+        // 格式範例：2025/12/28 23:55:00
+        const dateStr = now.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
+        document.getElementById('clock').innerHTML = dateStr + '<br>' + timeStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock(); // 立即執行一次
+
+    // 2. 從 n8n 抓取資料 (核心邏輯)
+    async function fetchData() {
+        try {
+            console.log("開始連線至 n8n...");
+            const res = await fetch(API_URL);
+            const json = await res.json();
+            
+            console.log("原始回傳資料:", json);
+
+            // --- 資料格式判斷與解析 (修正 Bug 的關鍵) ---
+            if (json.data) {
+                // 狀況 A: n8n 回傳了 { "data": ... } 結構
+                if (Array.isArray(json.data)) {
+                    announcements = json.data;
+                } else if (typeof json.data === 'string') {
+                    // 狀況 B: n8n 把陣列變成了字串，需要還原
+                    try {
+                        announcements = JSON.parse(json.data);
+                        console.log("成功解析字串型態的資料");
+                    } catch (e) {
+                        console.error("JSON 字串解析失敗", e);
+                        announcements = [];
+                    }
+                }
+            } else if (Array.isArray(json)) {
+                // 狀況 C: n8n 直接回傳陣列 [ ... ]
+                announcements = json;
+            } else {
+                console.error("無法識別資料格式", json);
+                announcements = [];
+            }
+            // -----------------------------------------
+
+            if (announcements.length > 0) {
+                console.log(`成功載入 ${announcements.length} 則公告`);
+                updateScreen();
+            } else {
+                console.warn("目前沒有公告資料");
+                document.getElementById('main-title').innerText = "目前無公告";
+                document.getElementById('main-content').innerText = "";
+            }
+
+        } catch (e) {
+            console.error("連線錯誤:", e);
+            document.getElementById('main-title').innerText = "系統連線異常";
+            document.getElementById('main-content').innerText = "請確認網路或 n8n 狀態\n" + e.message;
+        }
+    }
+
+    // 3. 更新畫面內容
+    function updateScreen() {
+        if (!Array.isArray(announcements) || announcements.length === 0) return;
+        
+        // 確保索引不會超出範圍
+        if (currentIndex >= announcements.length) currentIndex = 0;
+        
+        const item = announcements[currentIndex];
+        
+        // 讀取欄位 (同時支援中文與英文鍵名，以防萬一)
+        const title = item['標題'] || item.title || "無標題";
+        const content = item['內容'] || item.content || "";
+        const imgLink = item['圖片連結'] || item.image || "";
+        
+        // 更新大圖與文字
+        document.getElementById('main-title').innerText = title;
+        document.getElementById('main-content').innerText = content;
+        
+        // 圖片處理 (若無圖則顯示預設背景)
+        const placeholder = 'https://via.placeholder.com/1920x1080/333333/ffcc00?text=Company+News';
+        document.getElementById('main-img').src = imgLink ? imgLink : placeholder;
+
+        // 更新左側清單 (高亮目前項目)
+        let listHtml = "";
+        announcements.forEach((ann, idx) => {
+            const annTitle = ann['標題'] || ann.title || "無標題";
+            const activeClass = (idx === currentIndex) ? "active" : "inactive";
+            
+            listHtml += `<div class="list-item ${activeClass}">
+                            <h3>${annTitle}</h3>
+                         </div>`;
+        });
+        document.getElementById('list-container').innerHTML = listHtml;
+
+        // 準備下一輪
+        currentIndex++;
+    }
+
+    // --- 啟動程式 ---
+    fetchData(); // 第一次載入
+    
+    // 設定排程
+    setInterval(updateScreen, 10000); // 每 10 秒換下一則公告
+    setInterval(fetchData, 300000);   // 每 5 分鐘重新跟 Server 要一次資料
+
+</script>
+
+</body>
+</html>
