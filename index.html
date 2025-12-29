@@ -4,24 +4,67 @@
     <meta charset="UTF-8">
     <title>公司數位看板</title>
     <style>
+         /* 全局設定 */
         body { margin: 0; padding: 0; background: #000; color: #fff; font-family: "Microsoft JhengHei", "Heiti TC", sans-serif; overflow: hidden; }
-        #container { display: flex; height: 100vh; }
-        #sidebar { width: 30%; background: #222; padding: 40px; box-sizing: border-box; border-right: 5px solid #ffcc00; display: flex; flex-direction: column; }
-        #clock { font-size: 48px; font-weight: bold; margin-bottom: 40px; color: #aaa; }
-        #list-container { flex-grow: 1; overflow: hidden; }
+        #container { display: flex; height: 100vh; width: 100vw; }
         
-        #main { width: 70%; position: relative; }
-        #main img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
-        #overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); padding: 60px; }
+        /* 左側側邊欄 (保持原樣，微調配色) */
+        #sidebar { 
+            width: 30%; 
+            background: #1a1a1a; 
+            padding: 40px; 
+            box-sizing: border-box; 
+            border-right: 4px solid #ffcc00; 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        #clock { font-size: 42px; font-weight: bold; margin-bottom: 40px; color: #ddd; letter-spacing: 2px; }
+        #list-container { flex-grow: 1; overflow-y: auto; }
         
-        h1 { font-size: 64px; margin: 0 0 20px 0; color: #ffcc00; text-shadow: 2px 2px 4px #000; }
-        p { font-size: 32px; line-height: 1.5; white-space: pre-wrap; }
+        /* 右側主畫面 (改為上下佈局) */
+        #main { 
+            width: 70%; 
+            display: flex; 
+            flex-direction: column; /* 讓圖片在上面，文字在下面 */
+            background: #000;
+        }
+
+        /* 圖片區域設定 */
+        #main img { 
+            width: 100%; 
+            flex-grow: 1;      /* 佔據剩餘的所有空間 */
+            height: 0;         /* 配合 flex-grow 使用 */
+            object-fit: contain; /* 關鍵：讓圖片「完整顯示」不裁切 */
+            opacity: 1.0;      /* 恢復 100% 亮度 */
+            background-color: #000; /* 圖片旁若有留白，顯示黑色 */
+        }
+
+        /* 文字區域設定 (原本是 Overlay，現在變成獨立區塊) */
+        #overlay { 
+            position: relative; /* 取消懸浮，改為實體區塊 */
+            width: 100%; 
+            background: #222;   /* 深灰色背景 */
+            padding: 30px 50px; 
+            box-sizing: border-box;
+            border-top: 2px solid #444;
+            min-height: 200px; /* 保證文字區至少有高度 */
+        }
+        
+        h1 { font-size: 56px; margin: 0 0 15px 0; color: #ffcc00; }
+        p { font-size: 28px; line-height: 1.4; color: #eee; white-space: pre-wrap; margin: 0; }
         
         /* 列表項目的樣式 */
-        .list-item { margin-bottom: 30px; transition: all 0.3s; }
-        .list-item.active { color: #fff; border-left: 5px solid #ffcc00; padding-left: 15px; }
-        .list-item.inactive { color: #666; padding-left: 20px; }
-        .list-item h3 { margin: 0; font-size: 28px; }
+        .list-item { margin-bottom: 25px; transition: all 0.3s; opacity: 0.5; transform: translateX(0); }
+        .list-item.active { 
+            color: #fff; 
+            opacity: 1; 
+            border-left: 5px solid #ffcc00; 
+            padding-left: 20px; 
+            transform: translateX(10px); /* 作用中的項目稍微往右移 */
+        }
+        .list-item h3 { margin: 0; font-size: 26px; font-weight: normal; }
     </style>
 </head>
 <body>
